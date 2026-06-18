@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+    env_file:
+      - ../.env
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  models:
+    build:
+      context: ../models
+      dockerfile: Dockerfile
+    container_name: models-service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../models:/app
+      - ../data:/app/data
+    env_file:
+      - ../.env
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ../dashboard
+      dockerfile: Dockerfile
+    container_name: dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ../dashboard:/app
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # MySQL database
+  db:
+    image: mysql:8.4
+    container_name: db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-solar_demand_db}
+      MYSQL_USER: ${MYSQL_USER:-admin}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-admin}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  db_data:
