@@ -1,29 +1,21 @@
-# ---- Base Image ----
-FROM python:3.11-slim
-
-# ---- Environment setup ----
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# ---- Working directory ----
+FROM node:20-alpine AS deps
 WORKDIR /app
+COPY package.json .npmrc ./
+RUN npm install --no-audit --no-fund
 
-# ---- System dependencies ----
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# ---- Install Python dependencies first (better layer caching) ----
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# ---- Copy dashboard code ----
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN npm run build
 
-# ---- Expose Streamlit's default port ----
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 EXPOSE 8501
-
-# ---- Start command ----
-# Update "app.py" if your main Streamlit file has a different name
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ENV PORT=8501
+ENV HOSTNAME="0.0.0.0"
+CMD ["node", "server.js"]
