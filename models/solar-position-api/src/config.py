@@ -16,7 +16,7 @@ TIMEZONE: str = "Asia/Kolkata"
 # Solar panel physical parameters
 # Adjust these constants to match the panels being modelled.
 # ---------------------------------------------------------------------------
-PANEL_AREA_M2: float = 1.6   # m² — typical residential panel (~60-cell, 300 W); adjustable
+PANEL_AREA_M2: float = 1.2   # m² — typical residential panel (~60-cell, 300 W); adjustable
 PANEL_EFFICIENCY: float = 0.20  # 20% — standard monocrystalline efficiency; adjustable
 
 # ---------------------------------------------------------------------------
