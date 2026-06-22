@@ -9,3 +9,5 @@ uvicorn
 requests
 python-dotenv
 shap
+joblib
+matplotlib

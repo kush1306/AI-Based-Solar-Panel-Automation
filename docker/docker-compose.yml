@@ -18,14 +18,13 @@ services:
 
   models:
     build:
-      context: ../models
+      context: ../models/solar-position-api
       dockerfile: Dockerfile
     container_name: models-service
     ports:
       - "8001:8001"
     volumes:
-      - ../models:/app
-      - ../data:/app/data
+      - ../models/solar-position-api:/app
     env_file:
       - ../.env
     restart: unless-stopped
