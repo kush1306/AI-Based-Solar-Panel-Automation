@@ -1,0 +1,24 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out project code...'
+            }
+        }
+
+        stage('Build Solar Position API Image') {
+            steps {
+                echo 'Building Docker image...'
+                sh 'docker build -t solar-position-api ./models/solar-position-api'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Tests will run here once model artifact and backend are ready.'
+            }
+        }
+    }
+}
