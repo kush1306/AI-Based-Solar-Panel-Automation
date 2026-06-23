@@ -1,0 +1,11 @@
+pandas
+numpy
+pvlib
+scikit-learn
+xgboost
+lightgbm
+fastapi
+uvicorn
+requests
+python-dotenv
+shap
