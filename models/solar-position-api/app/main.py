@@ -132,6 +132,7 @@ class HealthResponse(BaseModel):
 class PredictResponse(BaseModel):
     timestamp: str
     location: dict[str, float]
+    sun_above_horizon: bool
     azimuth_deg: float
     elevation_deg: float
     zenith_deg: float
@@ -261,19 +262,50 @@ def predict() -> PredictResponse:
 
         # 2. Sun position
         sun = _get_sun_position(now)
+        sun_above_horizon: bool = sun["elevation"] > 0.0
 
         # 3. Live weather (with automatic fallback)
         weather_raw = fetch_live_weather(LATITUDE, LONGITUDE)
         weather_source = weather_raw.pop("weather_source")
         weather_values: dict[str, float] = weather_raw
 
-        # 4. Feature vector
+        # ------------------------------------------------------------------
+        # Physical constraint: shortwave radiation is identically zero when
+        # the sun is at or below the horizon (elevation <= 0).  The ML model
+        # was trained on daytime data and has no physical guarantee of
+        # outputting zero for negative elevations -- it may produce spurious
+        # positive values.  We therefore short-circuit the model entirely
+        # and return the physically correct answer directly.
+        # ------------------------------------------------------------------
+        if not sun_above_horizon:
+            logger.info(
+                "Sun below horizon (elevation=%.4f deg) -- skipping ML model, "
+                "returning physical zero for radiation and energy.",
+                sun["elevation"],
+            )
+            return PredictResponse(
+                timestamp=timestamp_str,
+                location={"latitude": LATITUDE, "longitude": LONGITUDE},
+                sun_above_horizon=False,
+                azimuth_deg=round(sun["azimuth"], 4),
+                elevation_deg=round(sun["elevation"], 4),
+                zenith_deg=round(sun["zenith"], 4),
+                predicted_shortwave_radiation_wm2=0.0,
+                estimated_energy_output_watts=0.0,
+                optimal_tilt_deg=90.0,   # panel stowed flat at night
+                panel_facing_direction="N/A (sun below horizon)",
+                model_used="physical_override",
+                weather_source=weather_source,
+                weather={k: round(v, 4) for k, v in weather_values.items()},
+            )
+
+        # 4. Feature vector (only reached when sun is above the horizon)
         feature_names: list[str] = _state["metadata"]["feature_names"]
         X = _build_feature_vector(sun, weather_values, now, feature_names)
 
         # 5. Predict irradiance
         y_pred = float(_state["model"].predict(X)[0])
-        y_pred = max(0.0, y_pred)   # irradiance cannot be negative
+        y_pred = max(0.0, y_pred)   # belt-and-suspenders guard
 
         # 6. Derived quantities
         energy_watts = compute_energy_output(y_pred, PANEL_AREA_M2, PANEL_EFFICIENCY)
@@ -289,6 +321,7 @@ def predict() -> PredictResponse:
         return PredictResponse(
             timestamp=timestamp_str,
             location={"latitude": LATITUDE, "longitude": LONGITUDE},
+            sun_above_horizon=True,
             azimuth_deg=round(sun["azimuth"], 4),
             elevation_deg=round(sun["elevation"], 4),
             zenith_deg=round(sun["zenith"], 4),
