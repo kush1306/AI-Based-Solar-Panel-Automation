@@ -25,11 +25,15 @@ ENV/
 # ---------------------------------------------------------------------------
 # Trained model artefacts
 # ---------------------------------------------------------------------------
+# best_model.pkl and model_metadata.json are committed intentionally
+# so the API can be deployed without retraining in CI/CD environments
+# (Docker builds and Jenkins pipelines load the model directly from the repo).
 *.pkl
+!src/model/best_model.pkl
 *.joblib
 *.h5
 *.onnx
-src/model/
+# src/model/ directory itself is NOT ignored so the above negations work
 
 # ---------------------------------------------------------------------------
 # Generated / derived data

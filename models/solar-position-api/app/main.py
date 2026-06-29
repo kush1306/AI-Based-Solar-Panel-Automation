@@ -77,9 +77,31 @@ _state: dict[str, Any] = {
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the trained model and metadata before the server starts serving."""
-    logger.info("Loading model from '%s' ...", _MODEL_PKL)
+    """
+    Startup: ensure the model is available (training if necessary), then load
+    it into memory exactly once so all requests share a single instance.
+    Shutdown: nothing to clean up.
+    """
     try:
+        if _MODEL_PKL.exists():
+            # Happy path: model artefacts are present (committed to repo or
+            # previously trained in this environment).
+            logger.info(
+                "Model found at '%s' -- loading from disk.", _MODEL_PKL
+            )
+        else:
+            # Cold-start path: artefacts are missing (fresh clone, new
+            # environment, CI runner without cached layers, etc.).
+            # Run the full training pipeline to produce them before loading.
+            logger.warning(
+                "Model not found at '%s' -- running training pipeline before "
+                "startup.  This may take several minutes.",
+                _MODEL_PKL,
+            )
+            from src.train import run_training_pipeline  # noqa: PLC0415
+            run_training_pipeline()
+            logger.info("Training pipeline complete -- model artefacts written.")
+
         _state["model"] = joblib.load(_MODEL_PKL)
         with open(_MODEL_META, "r", encoding="utf-8") as fh:
             _state["metadata"] = json.load(fh)
@@ -91,9 +113,8 @@ async def lifespan(app: FastAPI):
         )
     except Exception as exc:  # noqa: BLE001
         _state["load_error"] = str(exc)
-        logger.error("Failed to load model: %s", exc)
+        logger.error("Failed to load or train model: %s", exc)
     yield
-    # Shutdown: nothing to clean up
     logger.info("Server shutting down.")
 
 
