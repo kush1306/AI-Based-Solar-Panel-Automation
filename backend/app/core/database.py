@@ -1,7 +1,6 @@
 from collections.abc import Generator
 
 from functools import lru_cache
-from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker

@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import create_crud_router
 from app.core.database import get_db
 from app.schemas.common import MessageResponse, PaginatedResponse
 from app.schemas.entities import AlertCreate, AlertResponse, AlertUpdate

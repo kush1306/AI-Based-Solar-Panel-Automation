@@ -1,0 +1,14 @@
+[project]
+name = "solar-intelligence-backend"
+version = "1.0.0"
+requires-python = ">=3.11"
+
+[tool.pyright]
+include = ["app"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.11"
+extraPaths = ["."]
+typeCheckingMode = "basic"
+reportMissingImports = true
+reportMissingTypeStubs = false
