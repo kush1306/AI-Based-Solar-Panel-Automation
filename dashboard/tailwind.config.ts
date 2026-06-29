@@ -10,24 +10,36 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        butter: "#FFD84D",
-        pink: "#FFB6D5",
-        cream: "#FFF9EF",
-        sky: "#8FD3FF",
-        sage: "#A8D5BA",
-        orange: "#FF9F45",
-        outline: "#222222",
+        background: "#09090B",
+        surface: "#18181B",
+        "surface-elevated": "#27272A",
+        border: "rgba(255,255,255,0.08)",
+        muted: "#A1A1AA",
+        foreground: "#FAFAFA",
+        accent: {
+          DEFAULT: "#F59E0B",
+          foreground: "#09090B",
+        },
+        success: "#10B981",
+        warning: "#F97316",
+        error: "#EF4444",
+        info: "#0EA5E9",
       },
       fontFamily: {
-        pixel: ['"Press Start 2P"', "monospace"],
-        retro: ['"VT323"', "monospace"],
+        sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        retro: "4px 4px 0 0 #222222",
-        "retro-sm": "2px 2px 0 0 #222222",
+        card: "0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06)",
+        glow: "0 0 20px rgba(245,158,11,0.08)",
       },
-      borderRadius: {
-        retro: "12px",
+      animation: {
+        "fade-in": "fadeIn 0.4s ease-out",
+      },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
       },
     },
   },

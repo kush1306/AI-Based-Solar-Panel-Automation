@@ -2,40 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --accent-color: #ffd84d;
-}
-
 @layer base {
   * {
-    @apply border-outline;
+    @apply border-border;
+  }
+
+  html {
+    @apply scroll-smooth antialiased;
   }
 
   body {
-    @apply bg-cream text-outline antialiased;
-    font-family: "VT323", monospace;
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
 @layer utilities {
-  .font-pixel {
-    font-family: "Press Start 2P", monospace;
+  .glass-panel {
+    @apply bg-surface/80 backdrop-blur-xl;
   }
 
-  .font-retro {
-    font-family: "VT323", monospace;
+  .text-gradient-accent {
+    @apply bg-gradient-to-r from-amber-400 to-amber-500 bg-clip-text text-transparent;
   }
 }
 
-/* Retro scrollbar */
+/* Recharts dark theme overrides */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, 0.06);
+}
+
+.recharts-text {
+  fill: #a1a1aa;
+  font-size: 12px;
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #fff9ef;
-  border-left: 2px solid #222;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #ffb6d5;
-  border: 2px solid #222;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }

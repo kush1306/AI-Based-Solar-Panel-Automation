@@ -1,150 +1,218 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { AppShell } from "@/components/AppShell";
-import { KPIWidget } from "@/components/KPIWidget";
-import { SolarFactoryBanner } from "@/components/SolarFactoryBanner";
-import { WindowCard } from "@/components/WindowCard";
-import { BatteryCard } from "@/components/BatteryCard";
-import { WeatherCard } from "@/components/WeatherCard";
-import { ActivityFeed } from "@/components/ActivityFeed";
 import {
-  GenerationConsumptionChart,
-  EfficiencyGauge,
-  ForecastBarChart,
-} from "@/components/ChartWidgets";
+  Activity,
+  AlertTriangle,
+  Battery,
+  CloudSun,
+  Gauge,
+  Sun,
+  Zap,
+} from "lucide-react";
+import { AppShell } from "@/components/layout/app-shell";
+import { KpiCard } from "@/components/cards/kpi-card";
+import { PanelCard } from "@/components/cards/panel-card";
+import { PowerGenerationChart, BatteryGauge } from "@/components/charts/chart-widgets";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  kpiCards,
+  activityFeed,
+  analyticsStats,
+  batteryAlerts,
+  batteryOverview,
+  devices,
   hourlyGeneration,
-  forecastData,
-  energyFlow,
   liveStats,
 } from "@/lib/mock-data";
+import { getAqiLabel } from "@/lib/utils";
 
-function SolarPanelIllustration({ tilt }: { tilt: number }) {
-  return (
-    <svg viewBox="0 0 120 80" className="w-full rounded-lg border-2 border-outline bg-sky">
-      <rect y="60" width="120" height="20" fill="#A8D5BA" stroke="#222" strokeWidth="1" />
-      <g transform={`translate(60,50) rotate(${-tilt}) translate(-30,-18)`}>
-        <rect width="60" height="36" fill="#4A90D9" stroke="#222" strokeWidth="2" />
-        <line x1="20" y1="0" x2="20" y2="36" stroke="#222" />
-        <line x1="40" y1="0" x2="40" y2="36" stroke="#222" />
-        <line x1="0" y1="12" x2="60" y2="12" stroke="#222" />
-        <line x1="0" y1="24" x2="60" y2="24" stroke="#222" />
-        <rect x="27" y="36" width="6" height="14" fill="#888" stroke="#222" />
-      </g>
-      <text x="60" y="14" textAnchor="middle" fontSize="12" fill="#222" fontFamily="monospace">{tilt}°</text>
-    </svg>
-  );
-}
+const telemetryRows = [
+  { label: "Power Output", value: `${liveStats.solarGeneration} kW`, time: "Just now" },
+  { label: "Panel Voltage", value: "24.6 V", time: "Just now" },
+  { label: "Current Draw", value: "11.5 A", time: "Just now" },
+  { label: "Irradiance", value: "785 W/m²", time: "Just now" },
+  { label: "Tilt Angle", value: `${liveStats.currentTilt}°`, time: "Just now" },
+];
+
+const weatherMetrics = [
+  { label: "Temperature", value: `${liveStats.temperature}°C` },
+  { label: "Humidity", value: `${liveStats.humidity}%` },
+  { label: "Cloud Cover", value: `${liveStats.cloudCover}%` },
+  { label: "Wind Speed", value: `${liveStats.windSpeed} km/h` },
+  { label: "GHI", value: "785 W/m²" },
+  { label: "AQI", value: `${liveStats.aqi} ${getAqiLabel(liveStats.aqi)}` },
+];
 
 export default function DashboardPage() {
+  const onlineDevices = devices.filter((d) => d.status === "online").length;
+
   return (
-    <AppShell title="Dashboard">
-      <div className="space-y-4">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {kpiCards.map((card, i) => (
-            <motion.div key={card.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-              <KPIWidget {...card} />
-            </motion.div>
-          ))}
+    <AppShell
+      title="Dashboard"
+      description="Real-time overview of your solar power system"
+    >
+      {/* Row 1 — KPIs */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <KpiCard
+          title="Current Power"
+          value={`${(liveStats.solarGeneration * 1000).toFixed(0)} W`}
+          trend="12.5% vs yesterday"
+          trendUp
+          icon={Zap}
+          accent="sky"
+        />
+        <KpiCard
+          title="Today's Energy"
+          value={`${analyticsStats.totalToday} kWh`}
+          trend="8.3% vs yesterday"
+          trendUp
+          icon={Sun}
+          accent="amber"
+        />
+        <KpiCard
+          title="Battery SOC"
+          value={`${liveStats.batterySoc}%`}
+          subtitle={batteryOverview.status}
+          trend="5% vs yesterday"
+          trendUp
+          icon={Battery}
+          accent="emerald"
+        />
+        <KpiCard
+          title="Optimal Tilt"
+          value={`${liveStats.recommendedTilt}°`}
+          subtitle="AI Recommended"
+          icon={Gauge}
+          accent="purple"
+        />
+        <KpiCard
+          title="Weather"
+          value={`${liveStats.temperature}°C`}
+          subtitle={`AQI ${liveStats.aqi} · ${getAqiLabel(liveStats.aqi)}`}
+          icon={CloudSun}
+          accent="orange"
+        />
+        <KpiCard
+          title="System Status"
+          value="Online"
+          subtitle={`${onlineDevices}/${devices.length} devices active`}
+          icon={Activity}
+          accent="emerald"
+        />
+      </div>
+
+      {/* Row 2 — Charts */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div className="lg:col-span-7">
+          <PanelCard
+            title="Power Generation (Today)"
+            description="Actual vs predicted output"
+            action={<Button variant="outline" size="sm">Today</Button>}
+          >
+            <PowerGenerationChart data={hourlyGeneration} />
+          </PanelCard>
         </div>
 
-        <SolarFactoryBanner />
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* Solar Orientation */}
-          <WindowCard title="Solar Orientation">
-            <div className="space-y-3">
-              <SolarPanelIllustration tilt={liveStats.currentTilt} />
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Current Tilt", value: `${liveStats.currentTilt}°` },
-                  { label: "Recommended", value: `${liveStats.recommendedTilt}°`, highlight: true },
-                  { label: "Expected Gain", value: `+${liveStats.expectedGain}%`, green: true },
-                  { label: "Servo Status", value: liveStats.servoStatus, green: true },
-                ].map((s) => (
-                  <div key={s.label} className="rounded-lg border-2 border-outline bg-cream p-2">
-                    <p className="font-retro text-sm opacity-70">{s.label}</p>
-                    <p className={`font-retro text-xl font-bold ${s.highlight ? "text-red-500" : s.green ? "text-green-600" : ""}`}>{s.value}</p>
-                  </div>
-                ))}
+        <div className="lg:col-span-2">
+          <PanelCard title="Battery Status" description="Real-time SOC">
+            <BatteryGauge value={batteryOverview.soc} />
+            <div className="mt-4 space-y-2 border-t border-border pt-4">
+              {[
+                { label: "Voltage", value: "12.48 V" },
+                { label: "Current", value: batteryOverview.chargeRate },
+                { label: "Temp", value: `${batteryOverview.temperature}°C` },
+              ].map((item) => (
+                <div key={item.label} className="flex justify-between text-xs">
+                  <span className="text-muted">{item.label}</span>
+                  <span className="font-medium text-foreground">{item.value}</span>
+                </div>
+              ))}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="h-2 w-2 rounded-full bg-success" />
+                <span className="text-xs font-medium text-success">{batteryOverview.status}</span>
+                <span className="text-xs text-muted">· Health {batteryOverview.health}%</span>
               </div>
             </div>
-          </WindowCard>
+          </PanelCard>
+        </div>
 
-          {/* Energy Flow */}
-          <WindowCard title="Energy Flow" headerColor="bg-sage">
-            <div className="flex flex-col items-center gap-1">
-              {energyFlow.map((step, i) => (
-                <div key={step.id} className="flex flex-col items-center">
-                  <motion.div whileHover={{ scale: 1.05 }} className={`flex w-full max-w-[200px] flex-col items-center gap-1 rounded-retro border-[3px] border-outline p-3 shadow-retro-sm ${step.color}`}>
-                    <span className="text-2xl">{step.icon}</span>
-                    <span className="font-pixel text-[6px]">{step.label.toUpperCase()}</span>
-                    <span className="font-retro text-lg font-bold">{step.value}</span>
-                  </motion.div>
-                  {i < energyFlow.length - 1 && (
-                    <motion.span animate={{ y: [0, 4, 0] }} transition={{ repeat: Infinity, duration: 1 }} className="my-1 text-lg">▼</motion.span>
-                  )}
+        <div className="lg:col-span-3">
+          <PanelCard title="Weather Overview" description="Delhi, India">
+            <div className="space-y-3">
+              {weatherMetrics.map((m) => (
+                <div key={m.label} className="flex items-center justify-between rounded-lg border border-border/50 bg-background/40 px-3 py-2">
+                  <span className="text-xs text-muted">{m.label}</span>
+                  <span className="text-sm font-medium text-foreground">{m.value}</span>
                 </div>
               ))}
             </div>
-          </WindowCard>
+          </PanelCard>
         </div>
+      </div>
 
-        {/* AI Predictions */}
-        <WindowCard title="AI Predictions" headerColor="bg-sky">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <p className="mb-2 font-pixel text-[7px]">SOLAR ORIENTATION AI</p>
-              <div className="space-y-2">
-                <div className="flex justify-between font-retro text-lg"><span>Confidence</span><span className="font-bold">{liveStats.orientationConfidence}%</span></div>
-                <div className="h-3 overflow-hidden rounded-full border-2 border-outline bg-cream">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${liveStats.orientationConfidence}%` }} className="h-full bg-sage" />
+      {/* Row 3 — Lists */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <PanelCard
+          title="Recent Alerts"
+          action={<Button variant="ghost" size="sm" className="text-xs">View All</Button>}
+        >
+          <div className="space-y-3">
+            {batteryAlerts.map((alert) => (
+              <div key={alert.id} className="flex items-start gap-3 rounded-lg border border-border/50 p-3 transition-colors hover:bg-surface-elevated/30">
+                <AlertTriangle className={cnIcon(alert.level)} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-foreground">{alert.message}</p>
+                  <p className="mt-0.5 text-xs text-muted">{alert.time}</p>
                 </div>
-                <p className="font-retro text-lg">Recommended Tilt: <strong className="text-red-500">{liveStats.recommendedTilt}°</strong></p>
+                <Badge variant={alert.level === "warning" ? "warning" : alert.level === "success" ? "success" : "info"}>
+                  {alert.level}
+                </Badge>
               </div>
-            </div>
-            <div>
-              <p className="mb-2 font-pixel text-[7px]">CONSUMPTION FORECAST AI</p>
-              <div className="space-y-2">
-                <div className="flex justify-between font-retro text-lg"><span>Confidence</span><span className="font-bold">{liveStats.consumptionConfidence}%</span></div>
-                <div className="h-3 overflow-hidden rounded-full border-2 border-outline bg-cream">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${liveStats.consumptionConfidence}%` }} className="h-full bg-pink" />
-                </div>
-                <ForecastBarChart data={forecastData} />
-              </div>
-            </div>
+            ))}
           </div>
-        </WindowCard>
+        </PanelCard>
 
-        {/* Bottom row */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <WindowCard title="Generation vs Consumption" className="lg:col-span-1">
-            <GenerationConsumptionChart data={hourlyGeneration} />
-          </WindowCard>
-          <WindowCard title="System Efficiency" headerColor="bg-butter">
-            <EfficiencyGauge value={liveStats.systemEfficiency} />
-            <div className="mt-2 flex items-center justify-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full border border-outline bg-green-500" />
-              <span className="font-retro text-lg font-bold text-green-600">OPTIMAL</span>
-            </div>
-          </WindowCard>
-          <WindowCard title="Battery Status" headerColor="bg-sage">
-            <BatteryCard compact />
-          </WindowCard>
-        </div>
+        <PanelCard
+          title="Recent Telemetry"
+          action={<Button variant="ghost" size="sm" className="text-xs">View All</Button>}
+        >
+          <div className="space-y-2">
+            {telemetryRows.map((row) => (
+              <div key={row.label} className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2.5 hover:bg-surface-elevated/30">
+                <div>
+                  <p className="text-sm text-foreground">{row.label}</p>
+                  <p className="text-xs text-muted">{row.time}</p>
+                </div>
+                <span className="text-sm font-semibold text-accent">{row.value}</span>
+              </div>
+            ))}
+          </div>
+        </PanelCard>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <WindowCard title="Weather Summary" headerColor="bg-sky">
-            <WeatherCard />
-          </WindowCard>
-          <WindowCard title="Activity Feed" headerColor="bg-pink">
-            <ActivityFeed />
-          </WindowCard>
-        </div>
+        <PanelCard
+          title="System Logs"
+          action={<Button variant="ghost" size="sm" className="text-xs">View All</Button>}
+        >
+          <div className="space-y-2">
+            {activityFeed.map((log) => (
+              <div key={log.id} className="flex items-start gap-3 rounded-lg border border-border/50 px-3 py-2.5 hover:bg-surface-elevated/30">
+                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-success" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-foreground">{log.message}</p>
+                  <p className="text-xs text-muted">{log.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </PanelCard>
       </div>
     </AppShell>
   );
+}
+
+function cnIcon(level: string) {
+  const base = "h-4 w-4 shrink-0 mt-0.5";
+  if (level === "warning") return `${base} text-warning`;
+  if (level === "success") return `${base} text-success`;
+  return `${base} text-info`;
 }
