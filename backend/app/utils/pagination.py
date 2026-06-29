@@ -1,3 +1,5 @@
+import math
+
 from fastapi import Query
 
 
@@ -7,3 +9,8 @@ def pagination_params(
 ) -> dict[str, int]:
     skip = (page - 1) * page_size
     return {"page": page, "page_size": page_size, "skip": skip, "limit": page_size}
+
+
+def paginate_meta(total: int, page: int, page_size: int) -> dict[str, int]:
+    pages = math.ceil(total / page_size) if page_size else 0
+    return {"total": total, "page": page, "page_size": page_size, "pages": pages}

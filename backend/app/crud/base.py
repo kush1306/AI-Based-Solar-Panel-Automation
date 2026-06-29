@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import math
 from typing import Any, Generic, Type, TypeVar, cast
 
 from pydantic import BaseModel
-from sqlalchemy import func, inspect, select
+from sqlalchemy import String, cast as sql_cast, func, inspect as sa_inspect, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
@@ -19,7 +18,8 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     def __init__(self, model: Type[ModelType], resource_name: str):
         self.model = model
         self.resource_name = resource_name
-        self.pk_column = inspect(model).primary_key[0]
+        self.pk_column = sa_inspect(model).primary_key[0]
+        self.pk_name = self.pk_column.key
 
     def get(self, db: Session, item_id: int) -> ModelType:
         obj = db.scalar(select(self.model).where(self.pk_column == item_id))
@@ -35,6 +35,24 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 query = query.where(getattr(self.model, field) == value)
         return query
 
+    def _apply_search(self, query, search: str | None, search_fields: list[str] | None):
+        if not search or not search_fields:
+            return query
+        term = f"%{search}%"
+        clauses = []
+        for field in search_fields:
+            if hasattr(self.model, field):
+                column = getattr(self.model, field)
+                clauses.append(sql_cast(column, String).like(term))
+        if clauses:
+            query = query.where(or_(*clauses))
+        return query
+
+    def _resolve_sort_column(self, sort_by: str | None):
+        if sort_by and hasattr(self.model, sort_by):
+            return getattr(self.model, sort_by)
+        return self.pk_column
+
     def get_multi(
         self,
         db: Session,
@@ -42,19 +60,23 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         skip: int = 0,
         limit: int = 100,
         filters: dict[str, Any] | None = None,
-        order_by=None,
+        search: str | None = None,
+        search_fields: list[str] | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
     ) -> tuple[list[ModelType], int]:
         query = select(self.model)
         query = self._apply_filters(query, filters)
+        query = self._apply_search(query, search, search_fields)
 
         count_query = select(func.count()).select_from(self.model)
         count_query = self._apply_filters(count_query, filters)
+        count_query = self._apply_search(count_query, search, search_fields)
         total = db.scalar(count_query) or 0
 
-        if order_by is not None:
-            query = query.order_by(order_by)
-        else:
-            query = query.order_by(self.pk_column.desc())
+        sort_column = self._resolve_sort_column(sort_by)
+        ordering = sort_column.asc() if sort_order == "asc" else sort_column.desc()
+        query = query.order_by(ordering)
 
         items = list(db.scalars(query.offset(skip).limit(limit)).all())
         return cast(tuple[list[ModelType], int], (items, total))
@@ -83,8 +105,3 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db_obj = self.get(db, item_id)
         db.delete(db_obj)
         db.commit()
-
-
-def paginate(total: int, page: int, page_size: int) -> dict[str, int]:
-    pages = math.ceil(total / page_size) if page_size else 0
-    return {"total": total, "page": page, "page_size": page_size, "pages": pages}

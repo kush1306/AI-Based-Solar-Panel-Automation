@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     db_host: str = "127.0.0.1"
     db_port: int = 3306
-    db_name: str = "solar_demand_db"
+    db_name: str = "solar_panel_automation"
     db_user: str = "admin"
     db_password: str = "admin"
 

@@ -1,5 +1,7 @@
--- Reference schema for SQLAlchemy models (DO NOT run if database already exists)
--- Align models with your existing MySQL tables. Contact the data team if columns differ.
+# Reference schema — OUTDATED TEMPLATE. Do NOT run against production.
+# Authoritative schema mapping: backend/app/models/entities.py
+# Database name: solar_panel_automation
+# Align models with your existing MySQL tables. Contact the data team if columns differ.
 
 CREATE TABLE IF NOT EXISTS weather_data (
     id INT AUTO_INCREMENT PRIMARY KEY,

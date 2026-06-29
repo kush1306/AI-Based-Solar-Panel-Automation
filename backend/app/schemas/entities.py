@@ -248,5 +248,44 @@ class SystemLogCreate(SystemLogBase):
     pass
 
 
+class SystemLogUpdate(ORMModel):
+    timestamp: DateTimeType | None = None
+    module: str | None = Field(None, max_length=50)
+    event_type: str | None = Field(None, max_length=50)
+    description: str | None = Field(None, max_length=255)
+    status: str | None = None
+
+
 class SystemLogResponse(SystemLogBase):
     log_id: int
+
+
+__all__ = [
+    "WeatherCreate",
+    "WeatherUpdate",
+    "WeatherResponse",
+    "SolarPanelCreate",
+    "SolarPanelUpdate",
+    "SolarPanelResponse",
+    "SolarPredictionCreate",
+    "SolarPredictionUpdate",
+    "SolarPredictionResponse",
+    "EnergyConsumptionCreate",
+    "EnergyConsumptionUpdate",
+    "EnergyConsumptionResponse",
+    "BatteryCreate",
+    "BatteryUpdate",
+    "BatteryResponse",
+    "BatteryStatusCreate",
+    "BatteryStatusUpdate",
+    "BatteryStatusResponse",
+    "TelemetryCreate",
+    "TelemetryUpdate",
+    "TelemetryResponse",
+    "AlertCreate",
+    "AlertUpdate",
+    "AlertResponse",
+    "SystemLogCreate",
+    "SystemLogUpdate",
+    "SystemLogResponse",
+]

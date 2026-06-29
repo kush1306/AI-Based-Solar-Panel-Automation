@@ -1,15 +1,15 @@
-from app.api.deps import create_crud_router
+from app.crud import solar_prediction_crud
+from app.dependencies.crud_router import create_crud_router
 from app.schemas.entities import (
     SolarPredictionCreate,
     SolarPredictionResponse,
     SolarPredictionUpdate,
 )
-from app.services.crud import solar_prediction_service
 
 router = create_crud_router(
     prefix="/predictions",
     tags=["Solar Predictions"],
-    service=solar_prediction_service,
+    crud=solar_prediction_crud,
     response_schema=SolarPredictionResponse,
     create_schema=SolarPredictionCreate,
     update_schema=SolarPredictionUpdate,

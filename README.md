@@ -2,40 +2,63 @@
 
 ## Project Overview
 
-AI-powered system for solar panel monitoring, optimization, and energy forecasting. This repository contains the full-stack project scaffold with a **frontend-only demo dashboard** for the Smart Solar Optimization System.
+AI-powered system for solar panel monitoring, optimization, and energy forecasting.
 
 ## Team Members
 
 - Member 1 – Solar AI
 - Member 2 – Energy AI
-- Member 3 – Full Stack
+- Member 3 – Full Stack (backend, frontend, database)
 - Member 4 – DevOps & Integration
 - Member 5 – Data Engineer
-
-## Branch Strategy
-
-- `main`
-- `develop`
-- `member1-solar-ai`
-- `member2-energy-ai`
-- `member3-fullstack`
-- `member4-devops`
-- `member5-data`
 
 ## Project Structure
 
 ```
-├── backend/          # FastAPI backend (placeholder)
-├── dashboard/        # Next.js 15 frontend demo (mock data only)
-├── models/           # AI/ML model service (placeholder)
-├── docker/           # Docker Compose orchestration
-├── data/             # Shared data directory
-└── .env.example      # Environment variable template
+├── backend/          # FastAPI REST API + MySQL (Member 3)
+├── dashboard/        # Next.js 15 dashboard UI (Member 3)
+├── models/           # AI/ML model services (Member 1 & 2)
+├── docker/           # Docker Compose (Member 4 — DevOps)
+└── run-local.ps1     # Run backend + frontend together locally
 ```
+
+---
+
+## Member 3 — Backend, Frontend & Database
+
+### Database
+
+- **Name:** `solar_panel_automation`
+- **Tables:** weather_data, solar_panel, solar_predictions, energy_consumption, battery, battery_status, telemetry, alerts, system_logs
+- Models: `backend/app/models/entities.py`
+
+### Run everything locally (one command)
+
+```powershell
+.\run-local.ps1
+```
+
+Or run separately:
+
+| Service | Command | URL |
+|---|---|---|
+| Backend | `cd backend && uvicorn app.main:app --reload --port 8000` | http://localhost:8000/docs |
+| Frontend | `cd dashboard && npm run dev` | http://localhost:8501 |
+| MySQL | Must be running locally | port 3306 |
+
+Copy env files first:
+- `backend/.env.example` → `backend/.env`
+- `dashboard/.env.example` → `dashboard/.env.local`
+
+### Deployment handoff → Member 4
+
+Member 3 does **not** handle Docker/AWS. See **`backend/HANDOFF.md`** for ports, env vars, health checks, and build commands DevOps needs.
+
+---
 
 ## Dashboard — Smart Solar Optimization System
 
-The dashboard is a **frontend-only demo** built with mock data. No backend, authentication, or API integration is required to run it.
+The dashboard UI is built with Next.js. Pages currently use mock data; API routes are ready at `dashboard/src/lib/api-config.ts` for wiring to the backend.
 
 ### Tech Stack
 
@@ -135,37 +158,15 @@ The dashboard currently uses mock data. To wire live AI predictions:
 2. Call `http://localhost:8001/predict` from dashboard pages
 3. Map response fields: `optimal_tilt_deg`, `estimated_energy_output_watts`, `predicted_shortwave_radiation_wm2`
 
-## Docker Setup
+## Docker & Deployment (Member 4 — DevOps)
 
-From the `docker/` directory:
+Docker, AWS, Jenkins, and production deployment are **Member 4's responsibility**.
 
-```bash
-docker-compose up
-```
-
-Services:
-
-| Service | Port | Description |
-|---|---|---|
-| dashboard | 8501 | Next.js frontend |
-| backend | 8000 | API server |
-| models | 8001 | ML model service |
-| db | 3306 | MySQL database |
-
-## Jenkins Pipeline
-
-CI/CD pipeline configuration (skeleton) — see project docs for pipeline stages.
-
-## Deployment Plan
-
-1. Build and push Docker images for each service
-2. Deploy via Docker Compose or Kubernetes
-3. Connect dashboard to backend APIs (future integration)
-4. Wire AI model service for live predictions
+See `backend/HANDOFF.md` for what Member 3 delivers and what DevOps needs to configure.
 
 ## Future Enhancements
 
-- Connect dashboard to FastAPI backend
+- Wire dashboard pages to backend APIs via `api-config.ts`
 - Integrate real-time MQTT data from ESP32 sensors
 - Deploy solar orientation and consumption AI models
 - Add user authentication and role-based access

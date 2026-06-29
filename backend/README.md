@@ -1,23 +1,43 @@
 # Solar Intelligence Platform — Backend API
 
-FastAPI REST backend with MySQL connectivity for the solar monitoring platform.
+Production-ready FastAPI REST backend with MySQL connectivity for the solar monitoring platform.
 
 ## Stack
 
 - FastAPI + Uvicorn
 - SQLAlchemy ORM
 - Pydantic v2
-- MySQL (PyMySQL)
+- PyMySQL
+- python-dotenv
 
-## Quick Start (Local)
+## Project Structure
+
+```
+backend/
+├── app/
+│   ├── api/              # Route handlers (one module per resource)
+│   ├── crud/             # Reusable CRUD operations per table
+│   ├── dependencies/       # FastAPI dependencies (DB session, router factory)
+│   ├── models/             # SQLAlchemy models (maps to existing MySQL tables)
+│   ├── schemas/            # Pydantic request/response schemas
+│   ├── services/           # Business logic (dashboard aggregation, AI stub)
+│   ├── utils/              # Shared helpers (pagination)
+│   ├── core/               # Config, database, logging, exceptions
+│   └── main.py             # Application entry point
+├── requirements.txt
+├── .env.example
+└── README.md
+```
+
+## Quick Start
 
 ```powershell
 cd backend
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 pip install -e .
-copy .env.example .env   # or edit backend/.env
+copy .env.example .env   # set your MySQL credentials
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -30,43 +50,92 @@ uvicorn app.main:app --reload --port 8000
 |---|---|
 | `DB_HOST` | MySQL host |
 | `DB_PORT` | MySQL port (default 3306) |
-| `DB_NAME` | Database name |
+| `DB_NAME` | Database name (`solar_panel_automation`) |
 | `DB_USER` | Database user |
 | `DB_PASSWORD` | Database password |
 | `DATABASE_URL` | Optional full SQLAlchemy URL override |
 | `CORS_ORIGINS` | Comma-separated frontend origins |
 
-## API Overview
+Credentials are read from `backend/.env` — never hardcoded.
 
-| Resource | Base Path |
+## Database
+
+Connects to the **existing** MySQL database `solar_panel_automation`. The backend does **not** create or modify tables.
+
+| Table | Model | API prefix |
+|---|---|---|
+| `weather_data` | `WeatherData` | `/api/weather` |
+| `solar_panel` | `SolarPanel` | `/api/panels` |
+| `solar_predictions` | `SolarPrediction` | `/api/predictions` |
+| `energy_consumption` | `EnergyConsumption` | `/api/energy` |
+| `battery` | `Battery` | `/api/battery` |
+| `battery_status` | `BatteryStatus` | `/api/battery-status` |
+| `telemetry` | `Telemetry` | `/api/telemetry` |
+| `alerts` | `Alert` | `/api/alerts` |
+| `system_logs` | `SystemLog` | `/api/logs` |
+
+## CRUD Endpoints (every table)
+
+Each resource supports:
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/{resource}` | List all (paginated) |
+| `GET` | `/api/{resource}/{id}` | Get by ID |
+| `POST` | `/api/{resource}` | Create |
+| `PUT` | `/api/{resource}/{id}` | Update |
+| `DELETE` | `/api/{resource}/{id}` | Delete |
+
+List endpoints support `page`, `page_size`, `search`, `sort_by`, and `sort_order` query parameters.
+
+## HTTP Status Codes
+
+| Code | When |
 |---|---|
-| Weather | `/api/weather` |
-| Solar Panels | `/api/panels` |
-| Predictions | `/api/predictions` |
-| Energy | `/api/energy` |
-| Battery | `/api/battery` |
-| Battery Status | `/api/battery-status` |
-| Telemetry | `/api/telemetry` |
-| Alerts | `/api/alerts` (+ `/active`, `/history`) |
-| System Logs | `/api/logs` |
-| Dashboard | `/api/dashboard`, `/api/dashboard/charts` |
+| 200 | Successful read/update/delete |
+| 201 | Successful create |
+| 400 | Application validation errors |
+| 404 | Record not found |
+| 422 | Request validation failed |
+| 500 | Database or internal errors |
 
-All list endpoints support pagination (`page`, `page_size`), search, and sorting parameters where applicable.
+## CORS
 
-## AI Integration (Future)
+CORS is enabled for the Next.js frontend. Default allowed origins:
 
-AI inference is **not implemented**. Placeholder functions live in `app/services/ai_service.py` and raise `NotImplementedError`. The AI team can integrate models there without changing API routes.
+- `http://localhost:8501`
+- `http://127.0.0.1:8501`
 
-## Schema Reference
+Set `CORS_ORIGINS` in `.env` for additional origins.
 
-SQLAlchemy models map to existing MySQL tables. See `database/schema_reference.sql` for expected column layout. **Do not run this file if your database already exists** — it is documentation only.
+## Logging & Error Handling
 
-## Docker
+- Request/response logging via middleware
+- Validation errors logged and returned as JSON
+- Database errors caught centrally and returned as clean JSON responses
 
-From `docker/` directory:
+## AI Integration
 
-```bash
-docker-compose up backend db
+AI inference is **not implemented**. Placeholder stubs in `app/services/ai_service.py` raise `NotImplementedError`. The AI team can integrate models later without changing CRUD routes.
+
+## Frontend Integration
+
+From the Next.js dashboard, call the API at:
+
+```
+http://localhost:8000/api/{resource}
 ```
 
-Backend runs on port **8000**.
+Example:
+
+```
+GET http://localhost:8000/api/panels
+GET http://localhost:8000/api/dashboard
+```
+
+Ensure the frontend origin is listed in `CORS_ORIGINS`.
+
+## Deployment handoff (Member 4)
+
+Member 3 scope: backend, frontend, database connectivity only.
+See **[HANDOFF.md](HANDOFF.md)** for ports, env vars, health checks, and what DevOps needs to deploy.

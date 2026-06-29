@@ -1,15 +1,15 @@
-from app.api.deps import create_crud_router
+from app.crud import energy_consumption_crud
+from app.dependencies.crud_router import create_crud_router
 from app.schemas.entities import (
     EnergyConsumptionCreate,
     EnergyConsumptionResponse,
     EnergyConsumptionUpdate,
 )
-from app.services.crud import energy_consumption_service
 
 router = create_crud_router(
     prefix="/energy",
     tags=["Energy Consumption"],
-    service=energy_consumption_service,
+    crud=energy_consumption_crud,
     response_schema=EnergyConsumptionResponse,
     create_schema=EnergyConsumptionCreate,
     update_schema=EnergyConsumptionUpdate,

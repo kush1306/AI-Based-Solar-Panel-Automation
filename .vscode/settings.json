@@ -1,6 +1,6 @@
 {
   "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
-  "python.languageServer": "Pylance",
+  "python.languageServer": "None",
   "python.analysis.extraPaths": ["${workspaceFolder}/backend"],
   "python.autoComplete.extraPaths": ["${workspaceFolder}/backend"],
   "python.analysis.typeCheckingMode": "basic",
@@ -12,13 +12,25 @@
   "terminal.integrated.env.windows": {
     "PYTHONPATH": "${workspaceFolder}/backend"
   },
-  "pyright.disableLanguageServices": false,
+  "basedpyright.analysis.venvPath": "backend",
+  "basedpyright.analysis.venv": ".venv",
+  "basedpyright.analysis.extraPaths": ["${workspaceFolder}/backend"],
+  "basedpyright.analysis.typeCheckingMode": "basic",
+  "basedpyright.analysis.diagnosticMode": "workspace",
+  "pyright.disableLanguageServices": true,
   "pydev.lint.enabled": false,
   "pydev.lint.ignoreImportErrors": true,
   "pydev.workspace.sourceFolders": ["${workspaceFolder}/backend"],
   "pydev.python.defaultInterpreter": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
   "python.linting.enabled": false,
+  "python.linting.pylintEnabled": false,
   "problems.showCurrentInStatus": true,
+  "cSpell.enabled": true,
+  "cSpell.ignorePaths": [
+    "**/node_modules/**",
+    "**/.venv/**",
+    "**/Temp/**"
+  ],
   "cSpell.words": [
     "autoflush",
     "sessionmaker",
@@ -26,6 +38,11 @@
     "pymysql",
     "uvicorn",
     "fastapi",
-    "pydantic"
+    "pydantic",
+    "starlette",
+    "PYTHONPATH",
+    "pydev",
+    "Pylance",
+    "basedpyright"
   ]
 }

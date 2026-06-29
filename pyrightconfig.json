@@ -1,16 +1,22 @@
 {
   "include": ["backend/app"],
-  "exclude": ["**/__pycache__", "**/.venv", "**/node_modules"],
+  "exclude": [
+    "**/__pycache__",
+    "**/.venv",
+    "**/node_modules",
+    "**/Temp/**"
+  ],
+  "venvPath": "backend",
+  "venv": ".venv",
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
   "executionEnvironments": [
     {
       "root": "backend",
       "extraPaths": ["backend"],
-      "pythonVersion": "3.11",
-      "venv": ".venv",
-      "venvPath": "backend"
+      "pythonVersion": "3.11"
     }
-  ],
-  "typeCheckingMode": "basic",
-  "reportMissingImports": true,
-  "reportMissingTypeStubs": false
+  ]
 }
