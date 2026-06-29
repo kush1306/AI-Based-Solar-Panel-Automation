@@ -16,6 +16,7 @@ cd backend
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
+pip install -e .
 copy .env.example .env   # or edit backend/.env
 uvicorn app.main:app --reload --port 8000
 ```
