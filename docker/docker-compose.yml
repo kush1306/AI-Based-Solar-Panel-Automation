@@ -24,7 +24,7 @@ services:
     ports:
       - "8001:8000"
     volumes:
-      - ../models:/solar-position-api:/app
+      - ../models/solar-position-api:/app
       - ../data:/app/data
     env_file:
       - ../.env
