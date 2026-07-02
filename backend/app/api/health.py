@@ -13,10 +13,17 @@ router = APIRouter(tags=["Health"])
 
 
 @router.get("/health")
-async def health_check():
-    """Basic liveness check — API process is running."""
+async def health_check(db: Session = Depends(get_db)):
+    """Liveness check with optional database connectivity status."""
+    db_status = "connected"
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        db_status = "disconnected"
+
     return {
         "status": "healthy",
+        "database": db_status,
         "service": settings.app_name,
         "version": settings.app_version,
         "timestamp": datetime.utcnow().isoformat(),

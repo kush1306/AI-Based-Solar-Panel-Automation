@@ -42,7 +42,8 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 - **Swagger UI:** http://localhost:8000/docs
-- **Health:** http://localhost:8000/health
+- **Health:** http://localhost:8000/health (includes database status)
+- **Readiness:** http://localhost:8000/health/ready
 
 ## Environment Variables
 
@@ -116,7 +117,16 @@ Set `CORS_ORIGINS` in `.env` for additional origins.
 
 ## AI Integration
 
-AI inference is **not implemented**. Placeholder stubs in `app/services/ai_service.py` raise `NotImplementedError`. The AI team can integrate models later without changing CRUD routes.
+Real AI inference is **not implemented**. Placeholder stubs in `app/services/ai_service.py` raise `NotImplementedError`.
+
+For frontend development, use the **mock endpoints** (realistic dummy data):
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/mock/solar-prediction` | Mock tilt, power, irradiance prediction |
+| `GET /api/mock/energy` | Mock hourly energy load forecast (`horizon_hours=1-48`) |
+
+Both responses include `"source": "mock"`. Replace with real model calls when the AI team integrates.
 
 ## Frontend Integration
 
