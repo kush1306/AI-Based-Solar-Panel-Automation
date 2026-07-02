@@ -1,0 +1,19 @@
+{
+  "model_name": "lightgbm",
+  "test_rmse": 35.369109,
+  "test_mae": 16.558132,
+  "test_r2": 0.983016,
+  "feature_names": [
+    "azimuth",
+    "elevation",
+    "sin_hour",
+    "cos_hour",
+    "sin_doy",
+    "cos_doy",
+    "temperature_2m",
+    "relative_humidity_2m",
+    "cloud_cover",
+    "wind_speed_10m"
+  ],
+  "trained_at": "2026-06-29T14:21:40.830054+00:00"
+}

@@ -155,7 +155,11 @@ def load_data(test_years: int = 2) -> tuple[
 # ---------------------------------------------------------------------------
 
 def _make_base_estimators() -> dict[str, object]:
-    """Return fresh, unseeded base estimator instances keyed by model name."""
+    """Return fresh base estimator instances keyed by model name.
+
+    All estimators are seeded with random_state=42 so that training runs are
+    fully reproducible across machines and Python sessions.
+    """
     return {
         "xgboost": XGBRegressor(
             objective="reg:squarederror",
