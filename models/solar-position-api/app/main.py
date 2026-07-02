@@ -4,9 +4,10 @@ main.py -- FastAPI application for the solar-position-api service.
 Endpoints
 ---------
 GET /health   -- Liveness / model-loaded check.
-GET /predict  -- Zero-input prediction: uses server time + configured
-                 location to return irradiance forecast, energy output,
-                 and optimal panel geometry.
+GET /predict  -- Prediction endpoint.
+                 Optional query parameter: datetime_str (YYYY-MM-DDTHH:MM)
+                 - Omitted: uses server's current time + live Open-Meteo weather.
+                 - Provided: uses the given datetime + historical weather average.
 
 Start the server:
     uvicorn app.main:app --reload
@@ -20,14 +21,14 @@ import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import joblib
 import numpy as np
 import pandas as pd
 import pvlib
 import pytz
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -60,6 +61,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _MODEL_PKL = PROJECT_ROOT / "src" / "model" / "best_model.pkl"
 _MODEL_META = PROJECT_ROOT / "src" / "model" / "model_metadata.json"
+
+# datetime_str format accepted by /predict
+_DATETIME_FMT = "%Y-%m-%dT%H:%M"
+_DATETIME_FMT_EXAMPLE = "YYYY-MM-DDTHH:MM  e.g. 2026-08-15T14:00"
 
 # ---------------------------------------------------------------------------
 # Application state (loaded once at startup, shared across all requests)
@@ -126,9 +131,10 @@ app = FastAPI(
     description=(
         "Real-time solar panel angle optimisation for New Delhi. "
         "Combines deterministic sun-position calculations (pvlib) with "
-        "ML-based shortwave irradiance prediction (LightGBM)."
+        "ML-based shortwave irradiance prediction (LightGBM). "
+        "Pass ?datetime_str=YYYY-MM-DDTHH:MM to predict for any specific moment."
     ),
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -148,10 +154,12 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     model_name: str | None
     timestamp: str
+    features: dict[str, str]
 
 
 class PredictResponse(BaseModel):
     timestamp: str
+    datetime_source: str          # "current_server_time" | "user_provided"
     location: dict[str, float]
     sun_above_horizon: bool
     azimuth_deg: float
@@ -167,7 +175,7 @@ class PredictResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Helper: compute current sun position
+# Helper: sun position
 # ---------------------------------------------------------------------------
 def _get_sun_position(now: datetime) -> dict[str, float]:
     """
@@ -188,7 +196,66 @@ def _get_sun_position(now: datetime) -> dict[str, float]:
 
 
 # ---------------------------------------------------------------------------
-# Helper: build feature vector
+# Helper: historical weather average (used for user-provided datetimes)
+# ---------------------------------------------------------------------------
+def _historical_weather_for_datetime(target: datetime, doy_window: int = 15) -> dict[str, float]:
+    """
+    Compute the mean weather conditions from the local features dataset for
+    the hour-of-day and day-of-year that match *target*.
+
+    Used exclusively when the caller supplies a datetime_str -- live weather
+    would be meaningless for a past or future timestamp.
+
+    Parameters
+    ----------
+    target : datetime
+        The timezone-aware datetime the caller wants to predict for.
+    doy_window : int
+        Number of days on each side of target's day-of-year to include.
+
+    Returns
+    -------
+    dict with keys: temperature_2m, relative_humidity_2m, cloud_cover,
+                    wind_speed_10m.
+    """
+    from src.features import FEATURES_CSV  # noqa: PLC0415
+
+    path = Path(FEATURES_CSV)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Features dataset not found at '{path}'. "
+            "Run `python -m src.features` to generate it."
+        )
+
+    df = pd.read_csv(path, index_col="time", parse_dates=True)
+    if df.index.tz is None:
+        df.index = df.index.tz_localize(TIMEZONE)
+
+    target_hour = target.hour
+    target_doy = target.timetuple().tm_yday
+
+    hour_mask = df.index.hour == target_hour
+    doy = df.index.day_of_year
+    lower = target_doy - doy_window
+    upper = target_doy + doy_window
+    if lower < 1:
+        doy_mask = (doy >= 365 + lower) | (doy <= upper)
+    elif upper > 365:
+        doy_mask = (doy >= lower) | (doy <= upper - 365)
+    else:
+        doy_mask = (doy >= lower) & (doy <= upper)
+
+    subset = df.loc[hour_mask & doy_mask]
+    if subset.empty:
+        subset = df.loc[hour_mask]
+
+    weather_cols = ["temperature_2m", "relative_humidity_2m", "cloud_cover", "wind_speed_10m"]
+    means = subset[weather_cols].mean()
+    return {col: float(means[col]) for col in weather_cols}
+
+
+# ---------------------------------------------------------------------------
+# Helper: feature vector assembly
 # ---------------------------------------------------------------------------
 def _build_feature_vector(
     sun: dict[str, float],
@@ -217,9 +284,89 @@ def _build_feature_vector(
         "wind_speed_10m": weather["wind_speed_10m"],
     }
 
-    # Respect the exact column order from model_metadata.json
     row = {feat: values[feat] for feat in feature_names}
     return pd.DataFrame([row])
+
+
+# ---------------------------------------------------------------------------
+# Helper: shared prediction pipeline (sun position → weather → ML → response)
+# ---------------------------------------------------------------------------
+def _run_prediction(
+    now: datetime,
+    datetime_source: str,
+    weather_values: dict[str, float],
+    weather_source: str,
+) -> PredictResponse:
+    """
+    Execute the full prediction pipeline for a given datetime.
+
+    Parameters
+    ----------
+    now : datetime          Timezone-aware datetime to predict for.
+    datetime_source : str   "current_server_time" or "user_provided".
+    weather_values : dict   Four weather variables already resolved by caller.
+    weather_source : str    Source label for the weather values.
+    """
+    timestamp_str = now.isoformat()
+
+    # Sun position
+    sun = _get_sun_position(now)
+    sun_above_horizon: bool = sun["elevation"] > 0.0
+
+    # Physical override: radiation is zero by definition when sun is below horizon.
+    if not sun_above_horizon:
+        logger.info(
+            "Sun below horizon (elevation=%.4f deg) -- physical override applied.",
+            sun["elevation"],
+        )
+        return PredictResponse(
+            timestamp=timestamp_str,
+            datetime_source=datetime_source,
+            location={"latitude": LATITUDE, "longitude": LONGITUDE},
+            sun_above_horizon=False,
+            azimuth_deg=round(sun["azimuth"], 4),
+            elevation_deg=round(sun["elevation"], 4),
+            zenith_deg=round(sun["zenith"], 4),
+            predicted_shortwave_radiation_wm2=0.0,
+            estimated_energy_output_watts=0.0,
+            optimal_tilt_deg=90.0,
+            panel_facing_direction="N/A (sun below horizon)",
+            model_used="physical_override",
+            weather_source=weather_source,
+            weather={k: round(v, 4) for k, v in weather_values.items()},
+        )
+
+    # ML prediction
+    feature_names: list[str] = _state["metadata"]["feature_names"]
+    X = _build_feature_vector(sun, weather_values, now, feature_names)
+    y_pred = max(0.0, float(_state["model"].predict(X)[0]))
+
+    energy_watts = compute_energy_output(y_pred, PANEL_AREA_M2, PANEL_EFFICIENCY)
+    optimal_tilt = compute_optimal_tilt(sun["elevation"])
+    facing = azimuth_to_compass_direction(sun["azimuth"])
+
+    logger.info(
+        "Prediction -- radiation: %.2f W/m2 | energy: %.2f W | "
+        "tilt: %.1f deg | facing: %s | weather_source: %s | datetime_source: %s",
+        y_pred, energy_watts, optimal_tilt, facing, weather_source, datetime_source,
+    )
+
+    return PredictResponse(
+        timestamp=timestamp_str,
+        datetime_source=datetime_source,
+        location={"latitude": LATITUDE, "longitude": LONGITUDE},
+        sun_above_horizon=True,
+        azimuth_deg=round(sun["azimuth"], 4),
+        elevation_deg=round(sun["elevation"], 4),
+        zenith_deg=round(sun["zenith"], 4),
+        predicted_shortwave_radiation_wm2=round(y_pred, 4),
+        estimated_energy_output_watts=round(energy_watts, 4),
+        optimal_tilt_deg=round(optimal_tilt, 4),
+        panel_facing_direction=facing,
+        model_used=_state["metadata"]["model_name"],
+        weather_source=weather_source,
+        weather={k: round(v, 4) for k, v in weather_values.items()},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -230,8 +377,8 @@ def health() -> HealthResponse:
     """
     Liveness and model-readiness check.
 
-    Returns 200 with model_loaded=true when the service is ready to
-    serve predictions. Returns 503 if the model failed to load at startup.
+    Returns 200 with model_loaded=true when the service is ready to serve
+    predictions. Returns 503 if the model failed to load at startup.
     """
     now_utc = datetime.now(pytz.utc).isoformat()
     model_name = (
@@ -255,19 +402,35 @@ def health() -> HealthResponse:
         model_loaded=True,
         model_name=model_name,
         timestamp=now_utc,
+        features={
+            "optional_datetime": (
+                "Pass ?datetime_str=YYYY-MM-DDTHH:MM to predict for a specific time"
+            ),
+        },
     )
 
 
 @app.get("/predict", response_model=PredictResponse, tags=["Inference"])
-def predict() -> PredictResponse:
+def predict(
+    datetime_str: Optional[str] = Query(
+        default=None,
+        description=(
+            "Optional datetime for prediction in format YYYY-MM-DDTHH:MM "
+            "(e.g. 2026-08-15T14:00). "
+            "If omitted, the server's current time is used and live weather "
+            "is fetched. If provided, historical average weather is used instead."
+        ),
+    ),
+) -> PredictResponse:
     """
-    Generate a solar panel optimisation recommendation for the current moment.
+    Generate a solar panel optimisation recommendation.
 
-    No input required -- the server uses its configured location (New Delhi)
-    and the current wall-clock time automatically.
+    **Without datetime_str** (default): uses the server's current time and
+    fetches live weather from Open-Meteo (with historical fallback on failure).
 
-    Returns predicted irradiance, estimated power output, optimal panel tilt,
-    and the compass direction the panel should face.
+    **With datetime_str**: uses the provided datetime and computes weather from
+    the historical dataset (no live API call made).  Useful for backtesting
+    past datetimes or planning ahead for future ones.
     """
     if not _state["model_loaded"]:
         raise HTTPException(
@@ -276,84 +439,44 @@ def predict() -> PredictResponse:
         )
 
     try:
-        # 1. Current time in the configured timezone
         tz = pytz.timezone(TIMEZONE)
-        now = datetime.now(tz)
-        timestamp_str = now.isoformat()
 
-        # 2. Sun position
-        sun = _get_sun_position(now)
-        sun_above_horizon: bool = sun["elevation"] > 0.0
+        # ---------------------------------------------------------------
+        # Branch A: No datetime provided -- use current server time
+        # ---------------------------------------------------------------
+        if datetime_str is None:
+            now = datetime.now(tz)
+            weather_raw = fetch_live_weather(LATITUDE, LONGITUDE)
+            weather_source = weather_raw.pop("weather_source")
+            weather_values: dict[str, float] = weather_raw
+            datetime_source = "current_server_time"
 
-        # 3. Live weather (with automatic fallback)
-        weather_raw = fetch_live_weather(LATITUDE, LONGITUDE)
-        weather_source = weather_raw.pop("weather_source")
-        weather_values: dict[str, float] = weather_raw
+        # ---------------------------------------------------------------
+        # Branch B: Caller supplied a specific datetime
+        # ---------------------------------------------------------------
+        else:
+            try:
+                naive_dt = datetime.strptime(datetime_str, _DATETIME_FMT)
+            except ValueError:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Invalid format: '{datetime_str}'. "
+                        f"Use {_DATETIME_FMT_EXAMPLE}"
+                    ),
+                ) from None
 
-        # ------------------------------------------------------------------
-        # Physical constraint: shortwave radiation is identically zero when
-        # the sun is at or below the horizon (elevation <= 0).  The ML model
-        # was trained on daytime data and has no physical guarantee of
-        # outputting zero for negative elevations -- it may produce spurious
-        # positive values.  We therefore short-circuit the model entirely
-        # and return the physically correct answer directly.
-        # ------------------------------------------------------------------
-        if not sun_above_horizon:
+            now = tz.localize(naive_dt)
+            # Live weather is irrelevant for a past or future datetime.
+            weather_values = _historical_weather_for_datetime(now)
+            weather_source = "historical_average_for_provided_datetime"
+            datetime_source = "user_provided"
+
             logger.info(
-                "Sun below horizon (elevation=%.4f deg) -- skipping ML model, "
-                "returning physical zero for radiation and energy.",
-                sun["elevation"],
-            )
-            return PredictResponse(
-                timestamp=timestamp_str,
-                location={"latitude": LATITUDE, "longitude": LONGITUDE},
-                sun_above_horizon=False,
-                azimuth_deg=round(sun["azimuth"], 4),
-                elevation_deg=round(sun["elevation"], 4),
-                zenith_deg=round(sun["zenith"], 4),
-                predicted_shortwave_radiation_wm2=0.0,
-                estimated_energy_output_watts=0.0,
-                optimal_tilt_deg=90.0,   # panel stowed flat at night
-                panel_facing_direction="N/A (sun below horizon)",
-                model_used="physical_override",
-                weather_source=weather_source,
-                weather={k: round(v, 4) for k, v in weather_values.items()},
+                "User-provided datetime: %s | historical weather used.", now.isoformat()
             )
 
-        # 4. Feature vector (only reached when sun is above the horizon)
-        feature_names: list[str] = _state["metadata"]["feature_names"]
-        X = _build_feature_vector(sun, weather_values, now, feature_names)
-
-        # 5. Predict irradiance
-        y_pred = float(_state["model"].predict(X)[0])
-        y_pred = max(0.0, y_pred)   # belt-and-suspenders guard
-
-        # 6. Derived quantities
-        energy_watts = compute_energy_output(y_pred, PANEL_AREA_M2, PANEL_EFFICIENCY)
-        optimal_tilt = compute_optimal_tilt(sun["elevation"])
-        facing = azimuth_to_compass_direction(sun["azimuth"])
-
-        logger.info(
-            "Prediction -- radiation: %.2f W/m2 | energy: %.2f W | "
-            "tilt: %.1f deg | facing: %s | source: %s",
-            y_pred, energy_watts, optimal_tilt, facing, weather_source,
-        )
-
-        return PredictResponse(
-            timestamp=timestamp_str,
-            location={"latitude": LATITUDE, "longitude": LONGITUDE},
-            sun_above_horizon=True,
-            azimuth_deg=round(sun["azimuth"], 4),
-            elevation_deg=round(sun["elevation"], 4),
-            zenith_deg=round(sun["zenith"], 4),
-            predicted_shortwave_radiation_wm2=round(y_pred, 4),
-            estimated_energy_output_watts=round(energy_watts, 4),
-            optimal_tilt_deg=round(optimal_tilt, 4),
-            panel_facing_direction=facing,
-            model_used=_state["metadata"]["model_name"],
-            weather_source=weather_source,
-            weather={k: round(v, 4) for k, v in weather_values.items()},
-        )
+        return _run_prediction(now, datetime_source, weather_values, weather_source)
 
     except HTTPException:
         raise

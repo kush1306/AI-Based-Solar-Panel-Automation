@@ -68,6 +68,36 @@ uvicorn app.main:app --reload
 
 ---
 
+## API Usage
+
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Liveness check — returns model name and available features |
+| `GET` | `/predict` | Solar prediction for current or specified datetime |
+
+### `/predict` examples
+
+```bash
+# Current time (default) — uses live Open-Meteo weather
+curl http://localhost:8000/predict
+
+# Specific future datetime — uses historical average weather, no live API call
+curl "http://localhost:8000/predict?datetime_str=2026-12-21T12:00"
+
+# Specific past datetime — same historical weather path
+curl "http://localhost:8000/predict?datetime_str=2024-06-01T09:00"
+
+# Invalid format — returns HTTP 422 with clear error message
+curl "http://localhost:8000/predict?datetime_str=bad-format"
+```
+
+The `datetime_str` parameter uses `YYYY-MM-DDTHH:MM` format (24-hour clock, local
+`Asia/Kolkata` time). When omitted the server uses its current wall-clock time.
+
+---
+
 ## Configuration
 
 Edit **`src/config.py`** to change:
@@ -77,8 +107,8 @@ Edit **`src/config.py`** to change:
 | `LATITUDE` | `28.6139` | Site latitude |
 | `LONGITUDE` | `77.2090` | Site longitude |
 | `TIMEZONE` | `Asia/Kolkata` | Local timezone |
-| `PANEL_AREA_M2` | `1.2` | Panel surface area (m²) |
-| `PANEL_EFFICIENCY` | `0.20` | Panel efficiency (0–1) |
+| `PANEL_AREA_M2` | `1.6` | Panel surface area (m²) |
+| `PANEL_EFFICIENCY` | `0.20` | Panel efficiency (0-1) |
 
 ---
 

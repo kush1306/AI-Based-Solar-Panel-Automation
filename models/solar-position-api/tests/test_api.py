@@ -139,6 +139,17 @@ def api_client() -> Generator[TestClient, None, None]:
                 "app.main.fetch_live_weather",
                 side_effect=lambda *a, **kw: _FAKE_WEATHER_LIVE.copy(),
             ),
+            # Patch the historical weather lookup so tests that pass
+            # datetime_str never need data/delhi_features.csv on disk.
+            patch(
+                "app.main._historical_weather_for_datetime",
+                side_effect=lambda *a, **kw: {
+                    "temperature_2m": 28.0,
+                    "relative_humidity_2m": 60.0,
+                    "cloud_cover": 25.0,
+                    "wind_speed_10m": 9.0,
+                },
+            ),
         ):
             with TestClient(app) as c:
                 yield c
@@ -158,6 +169,12 @@ class TestHealth:
         assert "model_loaded" in data
         assert "model_name" in data
         assert "timestamp" in data
+        assert "features" in data
+
+    def test_features_advertises_optional_datetime(self, api_client: TestClient) -> None:
+        features = api_client.get("/health").json()["features"]
+        assert "optional_datetime" in features
+        assert isinstance(features["optional_datetime"], str)
 
     def test_status_ok_and_model_loaded(self, api_client: TestClient) -> None:
         data = api_client.get("/health").json()
@@ -177,6 +194,7 @@ class TestHealth:
 # All fields present on a successful /predict response.
 EXPECTED_PREDICT_FIELDS: dict[str, type] = {
     "timestamp": str,
+    "datetime_source": str,
     "location": dict,
     "sun_above_horizon": bool,
     "azimuth_deg": float,
@@ -271,6 +289,36 @@ class TestPredict:
         assert data["estimated_energy_output_watts"] == 0.0
         assert data["optimal_tilt_deg"] == 90.0
         assert data["model_used"] == "physical_override"
+
+
+# ---------------------------------------------------------------------------
+# Optional datetime_str parameter
+# ---------------------------------------------------------------------------
+
+class TestPredictDatetime:
+    def test_valid_datetime_str_returns_200_and_user_provided(self, api_client: TestClient) -> None:
+        """
+        A well-formed datetime_str should be accepted, used for sun-position
+        computation, and return datetime_source == "user_provided".
+        """
+        response = api_client.get("/predict", params={"datetime_str": "2026-08-15T12:00"})
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["datetime_source"] == "user_provided"
+        assert data["weather_source"] == "historical_average_for_provided_datetime"
+        # Timestamp in the response must reflect the provided datetime, not now
+        assert "2026-08-15" in data["timestamp"]
+
+    def test_invalid_datetime_str_returns_422(self, api_client: TestClient) -> None:
+        """
+        A malformed datetime_str must return HTTP 422 with a descriptive
+        error message -- never a 500 or a silent bad prediction.
+        """
+        response = api_client.get("/predict", params={"datetime_str": "not-a-date"})
+        assert response.status_code == 422, response.text
+        detail = response.json().get("detail", "")
+        assert "Invalid format" in detail
+        assert "YYYY-MM-DDTHH:MM" in detail
 
 
 # ---------------------------------------------------------------------------
