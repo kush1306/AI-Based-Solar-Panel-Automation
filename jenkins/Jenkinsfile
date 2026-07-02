@@ -4,21 +4,57 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo 'Checking out project code...'
+                echo 'Checking out source code...'
+                checkout scm
             }
         }
 
         stage('Build Solar Position API Image') {
             steps {
-                echo 'Building Docker image...'
+                echo 'Building Docker image for Solar Position API...'
                 sh 'docker build -t solar-position-api ./models/solar-position-api'
             }
         }
 
-        stage('Test') {
+        stage('Run Solar Position API Container') {
             steps {
-                echo 'Tests will run here once model artifact and backend are ready.'
+                echo 'Starting Solar Position API container...'
+                sh '''
+                    docker rm -f solar-position-api-test || true
+                    docker run -d --name solar-position-api-test -p 8000:8000 solar-position-api
+                    sleep 10
+                '''
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                echo 'Testing /health endpoint...'
+                sh 'curl -f http://localhost:8000/health'
+            }
+        }
+
+        stage('Prediction Endpoint Check') {
+            steps {
+                echo 'Testing /predict endpoint...'
+                sh 'curl -f http://localhost:8000/predict'
             }
         }
     }
+
+    post {
+        always {
+            echo 'Cleaning up test container...'
+            sh 'docker rm -f solar-position-api-test || true'
+        }
+
+        success {
+            echo 'Solar Position API Docker validation completed successfully.'
+        }
+
+        failure {
+            echo 'Pipeline failed. Check Docker build, container startup, or API endpoint logs.'
+        }
+    }
 }
+
