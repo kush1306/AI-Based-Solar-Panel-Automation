@@ -37,7 +37,7 @@ from pydantic import BaseModel, Field
 # ── path fix so imports work from project root ────────────────────────────────
 sys.path.insert(0, os.path.dirname(__file__))
 
-from data_loader import load_full_dataset, load_weather, generate_demand, download_from_openmeteo
+from data_loader import load_full_dataset, load_weather, generate_demand
 from demand_forecaster import DemandForecaster
 from battery_optimizer import RuleBasedOptimizer, LPDayAheadOptimizer, annual_report, BatteryConfig, SolarConfig, TariffConfig
 
@@ -80,31 +80,23 @@ STATE = {
 LOCAL_CSV = "data/delhi_openmeteo_hourly.csv"
 MODEL_PATH = "models/demand_random_forest.pkl"
 
-
 def _load_and_train(force_download=False):
     """Load Delhi data + train model. Called at startup and /data/reload."""
     global STATE
 
     if force_download:
-        logger.info("Force-downloading Delhi weather from OpenMeteo API...")
-        df = download_from_openmeteo(save_path=LOCAL_CSV)
-        source = "openmeteo_api_download"
-        if df is None:
-            logger.warning("OpenMeteo download failed, using fallback loader.")
-            df = None
+        logger.warning("Force download is not available because download_from_openmeteo is not implemented.")
+        df = None
     else:
         df = None
 
     if df is None:
-        df = load_full_dataset(
-            local_path=LOCAL_CSV,
-            save_downloaded_to=LOCAL_CSV,
-        )
+        df = load_full_dataset()
         source = _infer_source()
 
-    STATE["full_df"]    = df
-    STATE["data_source"]= source
-    STATE["loaded_at"]  = datetime.utcnow().isoformat()
+    STATE["full_df"] = df
+    STATE["data_source"] = source
+    STATE["loaded_at"] = datetime.utcnow().isoformat()
     logger.info(f"Dataset loaded: {len(df):,} rows from {source}")
 
     # Train model
