@@ -11,12 +11,21 @@ services:
     env_file:
       - ../.env
     environment:
-      - SOLAR_POSITION_API_URL=http://models:8000
-      - ENERGY_OPTIMIZATION_API_URL=http://energy-optimization:8000
+      DB_HOST: db
+      DATABASE_URL: mysql+pymysql://admin:admin@db:3306/solar_panel_automation
+      MODEL1_SERVICE_URL: http://models:8000
+      ENERGY_OPTIMIZATION_SERVICE_URL: http://energy-optimization:8000
+      MODEL_SERVICE_URL: http://models:8000
+      SOLAR_POSITION_API_URL: http://models:8000
+      ENERGY_OPTIMIZATION_API_URL: http://energy-optimization:8000
+      MODEL_SERVICE_TIMEOUT: "120"
     depends_on:
-      - db
-      - models
-      - energy-optimization
+      db:
+        condition: service_healthy
+      models:
+        condition: service_healthy
+      energy-optimization:
+        condition: service_healthy
     restart: unless-stopped
 
   models:
@@ -31,6 +40,12 @@ services:
       - ../data:/app/data
     env_file:
       - ../.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
 
   energy-optimization:
@@ -42,6 +57,12 @@ services:
       - "8002:8000"
     volumes:
       - "../Solar AI:/app"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 15s
+      retries: 15
+      start_period: 180s
     restart: unless-stopped
 
   dashboard:
@@ -51,8 +72,8 @@ services:
     container_name: dashboard
     ports:
       - "8501:8501"
-    volumes:
-      - ../dashboard:/app
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend
     restart: unless-stopped
@@ -62,13 +83,19 @@ services:
     container_name: db
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-solar_demand_db}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-solar_panel_automation}
       MYSQL_USER: ${MYSQL_USER:-admin}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-admin}
     ports:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
 volumes:

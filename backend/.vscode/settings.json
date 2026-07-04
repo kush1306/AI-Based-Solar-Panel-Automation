@@ -1,0 +1,10 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "basedpyright.analysis.venvPath": ".",
+  "basedpyright.analysis.venv": ".venv",
+  "basedpyright.analysis.extraPaths": ["${workspaceFolder}"],
+  "terminal.integrated.env.windows": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  "pydev.lint.enabled": false
+}
