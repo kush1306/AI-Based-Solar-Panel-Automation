@@ -15,11 +15,13 @@ import type {
   DeviceRow,
   EnergyConsumptionResponse,
   EnergyFlowDetailed,
+  EnergyForecastNextResponse,
+  EnergyOptimizeAnnualResponse,
+  EnergySummaryResponse,
   ForecastPoint,
   HistoricalWeatherPoint,
   HourlyGenerationPoint,
   LiveStats,
-  MockEnergyForecastResponse,
   ModelPerformanceRow,
   MonthlyReportPoint,
   PredictionHistoryRow,
@@ -437,31 +439,51 @@ export function mapSolarModelToOrientation(
   };
 }
 
-export function mapMockEnergyToConsumption(
-  forecast: MockEnergyForecastResponse,
+export function mapEnergyForecastToConsumption(
+  forecast: EnergyForecastNextResponse,
+  energySummary?: EnergySummaryResponse | null,
+  annualOptimization?: EnergyOptimizeAnnualResponse | null,
 ): AiConsumption {
-  const nextHour = forecast.forecast[0]?.predicted_load_kw ?? forecast.average_load_kw;
-  const peakHourLabel = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(
-    new Date(
-      new Date(forecast.forecast_start).getTime() + forecast.peak_hour * 3_600_000,
-    ),
-  );
+  const predictions = forecast.predictions ?? [];
+  const nextHour =
+    predictions[0]?.predicted_demand_kw ?? forecast.avg_demand_kw ?? 0;
+
+  let peakLoad = forecast.avg_demand_kw ?? 0;
+  let peakTimeRaw = predictions[0]?.time ?? forecast.from_time;
+
+  for (const point of predictions) {
+    const value = point.predicted_demand_kw ?? 0;
+    if (value >= peakLoad) {
+      peakLoad = value;
+      peakTimeRaw = point.time;
+    }
+  }
+
+  const metrics = energySummary?.model?.metrics;
+  const annualMetrics = annualOptimization?.annual_summary as
+    | { self_sufficiency_pct?: number }
+    | undefined;
+  const accuracy =
+    metrics?.r2 != null
+      ? Math.round(Math.min(100, Math.max(0, metrics.r2 * 100)))
+      : metrics?.mape != null
+        ? Math.round(Math.min(100, Math.max(0, 100 - metrics.mape)))
+        : annualMetrics?.self_sufficiency_pct != null
+          ? Math.round(annualMetrics.self_sufficiency_pct)
+          : 88;
 
   return {
     nextHourLoad: Number(nextHour.toFixed(1)),
-    peakTime: peakHourLabel,
-    accuracy: 88,
-    peakLoad: Number(forecast.peak_load_kw.toFixed(1)),
+    peakTime: peakTimeRaw ? formatHourLabel(peakTimeRaw) : "—",
+    accuracy,
+    peakLoad: Number(peakLoad.toFixed(1)),
   };
 }
 
-export function mapMockEnergyForecastChart(forecast: MockEnergyForecastResponse): ForecastPoint[] {
-  return forecast.forecast.slice(0, 7).map((point) => ({
-    time: formatHourLabel(point.timestamp),
-    value: Number(point.predicted_load_kw.toFixed(1)),
+export function mapEnergyForecastChart(forecast: EnergyForecastNextResponse): ForecastPoint[] {
+  return forecast.predictions.slice(0, 7).map((point) => ({
+    time: formatHourLabel(point.time),
+    value: Number((point.predicted_demand_kw ?? 0).toFixed(1)),
   }));
 }
 
@@ -484,7 +506,17 @@ export function mapPredictionHistory(
 
 export function mapModelPerformance(
   solarHealth: SolarModelHealthResponse | null,
+  energySummary?: EnergySummaryResponse | null,
+  energyModelAvailable = false,
 ): ModelPerformanceRow[] {
+  const energyMetrics = energySummary?.model?.metrics;
+  const energyAccuracy =
+    energyMetrics?.r2 != null
+      ? Math.round(Math.min(100, Math.max(0, energyMetrics.r2 * 100)))
+      : energyModelAvailable
+        ? 88
+        : 0;
+
   return [
     {
       name: solarHealth?.model_name ?? "Orientation Model v2.1",
@@ -492,9 +524,9 @@ export function mapModelPerformance(
       status: solarHealth?.model_loaded ? "Active" : "Unavailable",
     },
     {
-      name: "Consumption Model v1.8",
-      accuracy: 88,
-      status: "Active",
+      name: energySummary?.model?.name ?? "Consumption Model v1.8",
+      accuracy: energyAccuracy,
+      status: energyModelAvailable ? "Active" : "Unavailable",
     },
     {
       name: "Weather Model v1.2",

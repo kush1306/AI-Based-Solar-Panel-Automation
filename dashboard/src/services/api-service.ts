@@ -4,10 +4,13 @@ import type {
   AlertResponse,
   BatteryResponse,
   BatteryStatusResponse,
+  CombinedAiInsightsResponse,
   DashboardCharts,
   DashboardOverview,
   EnergyConsumptionResponse,
-  MockEnergyForecastResponse,
+  EnergyForecastNextResponse,
+  EnergyOptimizeAnnualResponse,
+  EnergySummaryResponse,
   SolarModelHealthResponse,
   SolarModelPredictResponse,
   SolarPanelResponse,
@@ -15,6 +18,8 @@ import type {
   TelemetryResponse,
   WeatherResponse,
 } from "@/types/api";
+
+const AI_REQUEST_TIMEOUT_MS = 120_000;
 
 export const apiService = {
   getDashboard(): Promise<DashboardOverview> {
@@ -105,8 +110,22 @@ export const apiService = {
     return fetchApi(API_ROUTES.aiSolarPredictionHealth);
   },
 
-  getMockEnergyForecast(horizonHours = 24): Promise<MockEnergyForecastResponse> {
-    return fetchApi(`${API_ROUTES.mockEnergy}?horizon_hours=${horizonHours}`);
+  getEnergySummary(): Promise<EnergySummaryResponse> {
+    return fetchApi(API_ROUTES.aiEnergySummary, { timeoutMs: AI_REQUEST_TIMEOUT_MS });
+  },
+
+  getAnnualOptimization(): Promise<EnergyOptimizeAnnualResponse> {
+    return fetchApi(API_ROUTES.aiEnergyOptimizeAnnual, { timeoutMs: AI_REQUEST_TIMEOUT_MS });
+  },
+
+  getEnergyForecast(hours = 24): Promise<EnergyForecastNextResponse> {
+    return fetchApi(`${API_ROUTES.aiEnergyForecastNext}?hours=${hours}`, {
+      timeoutMs: AI_REQUEST_TIMEOUT_MS,
+    });
+  },
+
+  getAIInsights(hours = 24): Promise<CombinedAiInsightsResponse> {
+    return fetchApi(`${API_ROUTES.aiInsights}?hours=${hours}`, { timeoutMs: AI_REQUEST_TIMEOUT_MS });
   },
 };
 

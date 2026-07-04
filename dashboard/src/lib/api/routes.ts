@@ -24,6 +24,9 @@ export const API_ROUTES = {
   dashboardCharts: `${API_BASE_URL}/api/dashboard/charts`,
   aiSolarPrediction: `${API_BASE_URL}/api/ai/solar-prediction`,
   aiSolarPredictionHealth: `${API_BASE_URL}/api/ai/solar-prediction/health`,
-  mockEnergy: `${API_BASE_URL}/api/mock/energy`,
+  aiEnergySummary: `${API_BASE_URL}/api/ai/energy/summary`,
+  aiEnergyOptimizeAnnual: `${API_BASE_URL}/api/ai/energy/optimize/annual`,
+  aiEnergyForecastNext: `${API_BASE_URL}/api/ai/energy/forecast/next`,
+  aiInsights: `${API_BASE_URL}/api/ai/insights`,
   mockSolarPrediction: `${API_BASE_URL}/api/mock/solar-prediction`,
 } as const;

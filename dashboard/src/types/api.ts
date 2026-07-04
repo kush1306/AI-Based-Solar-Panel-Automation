@@ -171,19 +171,51 @@ export interface EnergyForecastPoint {
   humidity: number | null;
 }
 
-export interface MockEnergyForecastResponse {
-  city: string;
-  forecast_start: string;
-  forecast_end: string;
-  horizon_hours: number;
-  total_predicted_load_kwh: number;
-  peak_load_kw: number;
-  peak_hour: number;
-  average_load_kw: number;
-  model_version: string;
-  forecast: EnergyForecastPoint[];
-  source: string;
-  note: string;
+export interface EnergyForecastNextResponse {
+  forecast_hours: number;
+  from_time: string | null;
+  to_time: string | null;
+  predictions: Array<{
+    time: string;
+    predicted_demand_kw?: number;
+    [key: string]: string | number | undefined;
+  }>;
+  total_predicted_kwh: number | null;
+  avg_demand_kw: number | null;
+}
+
+export interface EnergySummaryResponse {
+  system: Record<string, unknown> | null;
+  model: {
+    name?: string;
+    trained?: boolean;
+    metrics?: {
+      r2?: number;
+      mape?: number;
+      mae?: number;
+      rmse?: number;
+      [key: string]: number | undefined;
+    };
+  } | null;
+  dataset: Record<string, unknown> | null;
+  economics: Record<string, unknown> | null;
+  timestamp_utc: string | null;
+}
+
+export interface EnergyOptimizeAnnualResponse {
+  annual_summary: Record<string, unknown>;
+  monthly_breakdown: Array<Record<string, unknown>>;
+  currency: string | null;
+  system: Record<string, unknown> | null;
+}
+
+export interface CombinedAiInsightsResponse {
+  solar_prediction: Record<string, unknown> | null;
+  energy_summary: Record<string, unknown> | null;
+  energy_forecast: EnergyForecastNextResponse | Record<string, unknown> | null;
+  solar_model_available: boolean;
+  energy_model_available: boolean;
+  errors: string[];
 }
 
 /** UI view-model types (camelCase, matching mock-data shapes). */
