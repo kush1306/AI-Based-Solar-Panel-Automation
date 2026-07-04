@@ -9,52 +9,164 @@ pipeline {
             }
         }
 
-        stage('Build Solar Position API Image') {
+        stage('Prepare Environment') {
             steps {
-                echo 'Building Docker image for Solar Position API...'
-                sh 'docker build -t solar-position-api ./models/solar-position-api'
-            }
-        }
-
-        stage('Run Solar Position API Container') {
-            steps {
-                echo 'Starting Solar Position API container...'
+                echo 'Preparing .env file for Docker Compose...'
                 sh '''
-                    docker rm -f solar-position-api-test || true
-                    docker run -d --name solar-position-api-test -p 8000:8000 solar-position-api
-                    sleep 10
+                    cat > .env <<EOF
+MYSQL_ROOT_PASSWORD=rootpass
+MYSQL_DATABASE=solar_panel_automation
+MYSQL_USER=admin
+MYSQL_PASSWORD=admin
+
+DATABASE_URL=mysql+pymysql://admin:admin@db:3306/solar_panel_automation
+
+DB_HOST=db
+DB_PORT=3306
+DB_NAME=solar_panel_automation
+DB_USER=admin
+DB_PASSWORD=admin
+
+APP_NAME=Solar Intelligence Platform API
+DEBUG=false
+LOG_LEVEL=INFO
+CORS_ORIGINS=http://localhost:8501,http://127.0.0.1:8501,http://localhost:3000
+
+MODEL1_SERVICE_URL=http://models:8000
+MODEL_SERVICE_URL=http://models:8000
+SOLAR_POSITION_API_URL=http://models:8000
+
+ENERGY_OPTIMIZATION_SERVICE_URL=http://energy-optimization:8000
+ENERGY_OPTIMIZATION_API_URL=http://energy-optimization:8000
+
+MODEL_SERVICE_TIMEOUT=120
+
+NEXT_PUBLIC_API_URL=http://localhost:8000
+EOF
                 '''
             }
         }
 
-        stage('Health Check') {
+        stage('Build Full Docker Compose Stack') {
             steps {
-                echo 'Testing /health endpoint...'
-                sh 'curl -f http://localhost:8000/health'
+                echo 'Building backend, dashboard, database, Model 1, and Model 2 services...'
+                dir('docker') {
+                    sh 'docker compose build --no-cache'
+                }
             }
         }
 
-        stage('Prediction Endpoint Check') {
+        stage('Start Full Stack') {
             steps {
-                echo 'Testing /predict endpoint...'
-                sh 'curl -f http://localhost:8000/predict'
+                echo 'Starting full Docker Compose stack...'
+                dir('docker') {
+                    sh '''
+                        docker compose down || true
+                        docker compose up -d
+                        sleep 40
+                    '''
+                }
+            }
+        }
+
+        stage('Create Database Tables') {
+            steps {
+                echo 'Creating required database tables...'
+                dir('docker') {
+                    sh '''
+                        docker compose exec -T backend python -c "from app.core.database import Base, get_engine; import app.models.entities; Base.metadata.create_all(bind=get_engine()); print('Database tables created successfully')"
+                    '''
+                }
+            }
+        }
+
+        stage('Check Running Containers') {
+            steps {
+                echo 'Checking container status...'
+                dir('docker') {
+                    sh 'docker compose ps'
+                }
+            }
+        }
+
+        stage('Service Health Checks') {
+            steps {
+                echo 'Testing health endpoints...'
+                sh '''
+                    curl -f http://localhost:8000/health
+                    curl -f http://localhost:8001/health
+                    curl -f http://localhost:8002/health
+                    curl -f http://localhost:8501
+                '''
+            }
+        }
+
+        stage('Model 1 Integration Test') {
+            steps {
+                echo 'Testing Solar Position API through backend...'
+                sh '''
+                    curl -f http://localhost:8000/api/ai/solar-prediction
+                    curl -f http://localhost:8000/api/ai/solar-prediction/health
+                '''
+            }
+        }
+
+        stage('Model 2 Integration Test') {
+            steps {
+                echo 'Testing Energy Optimization API through backend...'
+                sh '''
+                    curl -f http://localhost:8000/api/ai/energy/summary
+                    curl -f http://localhost:8000/api/ai/energy/optimize/annual
+                    curl -f "http://localhost:8000/api/ai/energy/forecast/next?hours=24"
+                '''
+            }
+        }
+
+        stage('Combined AI Insights Test') {
+            steps {
+                echo 'Testing combined AI insights endpoint...'
+                sh '''
+                    curl -f "http://localhost:8000/api/ai/insights?hours=24"
+                '''
+            }
+        }
+
+        stage('Dashboard Dependency Test') {
+            steps {
+                echo 'Testing backend routes required by dashboard pages...'
+                sh '''
+                    curl -f http://localhost:8000/api/panels
+                    curl -f "http://localhost:8000/api/predictions?page_size=10"
+                '''
             }
         }
     }
 
     post {
         always {
-            echo 'Cleaning up test container...'
-            sh 'docker rm -f solar-position-api-test || true'
+            echo 'Showing Docker Compose status and logs...'
+            dir('docker') {
+                sh '''
+                    docker compose ps || true
+                    docker compose logs backend --tail=80 || true
+                    docker compose logs dashboard --tail=80 || true
+                    docker compose logs models --tail=50 || true
+                    docker compose logs energy-optimization --tail=50 || true
+                '''
+            }
+
+            echo 'Cleaning up Docker Compose stack...'
+            dir('docker') {
+                sh 'docker compose down || true'
+            }
         }
 
         success {
-            echo 'Solar Position API Docker validation completed successfully.'
+            echo 'Full Docker Compose integration pipeline completed successfully.'
         }
 
         failure {
-            echo 'Pipeline failed. Check Docker build, container startup, or API endpoint logs.'
+            echo 'Pipeline failed. Check Docker Compose logs and failed API endpoint.'
         }
     }
 }
-
