@@ -5,21 +5,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+COPY requirements.txt .
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gfortran \
-    libopenblas-dev \
+    libgomp1 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Train at build time if model artefacts are missing (uses cached delhi_features.csv)
-RUN python -m src.train
+EXPOSE 8000
 
-EXPOSE 8001
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

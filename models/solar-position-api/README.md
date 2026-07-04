@@ -77,7 +77,7 @@ Edit **`src/config.py`** to change:
 | `LATITUDE` | `28.6139` | Site latitude |
 | `LONGITUDE` | `77.2090` | Site longitude |
 | `TIMEZONE` | `Asia/Kolkata` | Local timezone |
-| `PANEL_AREA_M2` | `1.6` | Panel surface area (m²) |
+| `PANEL_AREA_M2` | `1.2` | Panel surface area (m²) |
 | `PANEL_EFFICIENCY` | `0.20` | Panel efficiency (0–1) |
 
 ---

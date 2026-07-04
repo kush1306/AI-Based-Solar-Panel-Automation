@@ -4,6 +4,13 @@ from datetime import datetime as DateTimeType
 from pydantic import Field
 
 from app.schemas.common import ORMModel
+from app.schemas.enums import (
+    AlertSeverity,
+    AlertStatus,
+    AssetStatus,
+    ChargingStatus,
+    SystemLogStatus,
+)
 
 
 class WeatherBase(ORMModel):
@@ -44,7 +51,7 @@ class SolarPanelBase(ORMModel):
     panel_efficiency: float | None = None
     installation_date: date | None = None
     current_tilt: float | None = None
-    status: str | None = "Active"
+    status: AssetStatus | None = "Active"
 
 
 class SolarPanelCreate(SolarPanelBase):
@@ -57,7 +64,7 @@ class SolarPanelUpdate(ORMModel):
     panel_efficiency: float | None = None
     installation_date: date | None = None
     current_tilt: float | None = None
-    status: str | None = None
+    status: AssetStatus | None = None
 
 
 class SolarPanelResponse(SolarPanelBase):
@@ -127,7 +134,7 @@ class BatteryBase(ORMModel):
     nominal_voltage: float | None = None
     installation_date: date | None = None
     health_percentage: float | None = None
-    status: str | None = "Active"
+    status: AssetStatus | None = "Active"
 
 
 class BatteryCreate(BatteryBase):
@@ -141,7 +148,7 @@ class BatteryUpdate(ORMModel):
     nominal_voltage: float | None = None
     installation_date: date | None = None
     health_percentage: float | None = None
-    status: str | None = None
+    status: AssetStatus | None = None
 
 
 class BatteryResponse(BatteryBase):
@@ -155,7 +162,7 @@ class BatteryStatusBase(ORMModel):
     voltage: float
     current: float
     temperature: float | None = None
-    charging_status: str
+    charging_status: ChargingStatus
 
 
 class BatteryStatusCreate(BatteryStatusBase):
@@ -169,7 +176,7 @@ class BatteryStatusUpdate(ORMModel):
     voltage: float | None = None
     current: float | None = None
     temperature: float | None = None
-    charging_status: str | None = None
+    charging_status: ChargingStatus | None = None
 
 
 class BatteryStatusResponse(BatteryStatusBase):
@@ -213,9 +220,9 @@ class AlertBase(ORMModel):
     battery_id: int | None = None
     alert_time: DateTimeType
     alert_type: str = Field(..., max_length=50)
-    severity: str
+    severity: AlertSeverity
     message: str | None = Field(None, max_length=255)
-    status: str | None = "Active"
+    status: AlertStatus | None = "Active"
 
 
 class AlertCreate(AlertBase):
@@ -227,9 +234,9 @@ class AlertUpdate(ORMModel):
     battery_id: int | None = None
     alert_time: DateTimeType | None = None
     alert_type: str | None = Field(None, max_length=50)
-    severity: str | None = None
+    severity: AlertSeverity | None = None
     message: str | None = Field(None, max_length=255)
-    status: str | None = None
+    status: AlertStatus | None = None
 
 
 class AlertResponse(AlertBase):
@@ -241,7 +248,7 @@ class SystemLogBase(ORMModel):
     module: str = Field(..., max_length=50)
     event_type: str = Field(..., max_length=50)
     description: str | None = Field(None, max_length=255)
-    status: str
+    status: SystemLogStatus
 
 
 class SystemLogCreate(SystemLogBase):
@@ -253,7 +260,7 @@ class SystemLogUpdate(ORMModel):
     module: str | None = Field(None, max_length=50)
     event_type: str | None = Field(None, max_length=50)
     description: str | None = Field(None, max_length=255)
-    status: str | None = None
+    status: SystemLogStatus | None = None
 
 
 class SystemLogResponse(SystemLogBase):

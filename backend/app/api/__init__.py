@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from . import (
+    ai,
     alerts,
     battery,
     battery_status,
@@ -15,6 +16,7 @@ from . import (
 )
 
 router = APIRouter()
+router.include_router(ai.router)
 router.include_router(weather.router)
 router.include_router(solar_panel.router)
 router.include_router(predictions.router)

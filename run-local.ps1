@@ -1,5 +1,8 @@
-# Run backend + frontend together (local development)
+# Run backend + frontend together (local development — no Docker required)
 # Usage: .\run-local.ps1
+#
+# For the FULL stack (MySQL + both AI models in containers), install Docker Desktop
+# and run: .\docker\compose-up.ps1
 
 $Root = $PSScriptRoot
 $Backend = Join-Path $Root "backend"
