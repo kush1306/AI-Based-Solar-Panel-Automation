@@ -140,6 +140,14 @@ EOF
                 '''
             }
         }
+        stage('Demo Window') {
+            steps {
+              echo 'Full stack is running for demo.'
+              echo 'Open dashboard at: http://localhost:8501'
+              echo 'AI Predictions page: http://localhost:8501/ai-predictions'
+              sh 'sleep 300'
+    }
+}
     }
 
     post {
