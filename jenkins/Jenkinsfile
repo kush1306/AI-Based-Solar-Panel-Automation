@@ -51,7 +51,7 @@ EOF
             steps {
                 echo 'Building backend, dashboard, database, Model 1, and Model 2 services...'
                 dir('docker') {
-                    sh 'docker compose build --no-cache'
+                    sh 'docker compose build'
                 }
             }
         }
