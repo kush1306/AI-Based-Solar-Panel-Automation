@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
@@ -5,6 +7,7 @@ from fastapi.responses import RedirectResponse, Response
 from app.api.health import router as health_router
 from app.api import router as api_router
 from app.core.config import settings
+from app.core.database import init_database
 from app.core.exceptions import register_exception_handlers
 from app.core.logging_config import RequestLoggingMiddleware, setup_logging
 
@@ -21,6 +24,13 @@ FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
 
 setup_logging()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_database()
+    yield
+
+
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
@@ -31,6 +41,7 @@ app = FastAPI(
     ),
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 register_exception_handlers(app)
